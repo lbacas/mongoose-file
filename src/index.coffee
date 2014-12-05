@@ -96,28 +96,34 @@ filePlugin = (schema, options={}) ->
       else
         dst = path.join(upload_to, fileObj.name)
       dst_dirname = path.dirname(dst)
-      mkdirp dst_dirname, (err) =>
-        throw err  if err
-        fs.rename u_path, dst, (err) =>
-          if (err)
-            # delete the temporary file, so that the explicitly set temporary upload dir does not get filled with unwanted files
-            fs.unlink u_path, (err) =>
-              throw err  if err
-            throw err
-          console.log("moved from #{u_path} to #{dst}")
-          rel = dst
-          if relative_to
-            if is_callable(relative_to)
-              rel = relative_to.call(@, fileObj)
-            else
-              rel = path.relative(relative_to, dst)
-          @set("#{pathname}.name", fileObj.name)
-          @set("#{pathname}.path", dst)
-          @set("#{pathname}.rel", rel)
-          @set("#{pathname}.type", fileObj.type)
-          @set("#{pathname}.size", fileObj.size)
-          @set("#{pathname}.lastModified", fileObj.lastModifiedDate)
-          @markModified(pathname)
+
+      mkdirp.sync(dst_dirname)
+      try
+        fs.renameSync u_path, dst
+      catch err
+        rs = fs.createReadStream(u_path)
+        ws = fs.createWriteStream(dst)
+
+        rs.pipe(ws)
+        rs.on 'end', () ->
+          # delete the temporary file, so that the explicitly set temporary upload dir does not get filled with unwanted files
+          fs.unlink u_path, (err) ->
+            throw err  if err
+
+      console.log("moved from #{u_path} to #{dst}")
+      rel = dst
+      if relative_to
+        if is_callable(relative_to)
+          rel = relative_to.call(@, fileObj)
+        else
+          rel = path.relative(relative_to, dst)
+      @set("#{pathname}.name", fileObj.name)
+      @set("#{pathname}.path", dst)
+      @set("#{pathname}.rel", rel)
+      @set("#{pathname}.type", fileObj.type)
+      @set("#{pathname}.size", fileObj.size)
+      @set("#{pathname}.lastModified", fileObj.lastModifiedDate)
+      @markModified(pathname)
     else
       dst = u_path
       rel = dst
